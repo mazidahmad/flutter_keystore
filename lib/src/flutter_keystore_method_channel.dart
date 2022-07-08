@@ -13,12 +13,6 @@ class MethodChannelFlutterKeystore extends FlutterKeystorePlatform {
   final methodChannel = const MethodChannel('flutter_keystore');
 
   @override
-  Future<String?> getPlatformVersion() async {
-    final version = await methodChannel.invokeMethod<String>('getPlatformVersion');
-    return version;
-  }
-
-  @override
   Future<Uint8List?> encrypt({required AccessControl accessControl, required String message}) async{
     final result = await methodChannel.invokeMethod<Uint8List?>('encrypt', {
       'tag': accessControl.tag,

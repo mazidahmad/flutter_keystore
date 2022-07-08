@@ -1,8 +1,5 @@
 package mvzd.flutter_keystore
 
-import Core
-import Core.Companion.decrypt
-import Core.Companion.encrypt
 import android.content.Context
 import androidx.annotation.NonNull
 
@@ -11,11 +8,20 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import mvzd.flutter_keystore.ciphers.StorageCipher18Implementation
 
 /** FlutterKeystorePlugin */
 class FlutterKeystorePlugin: FlutterPlugin, MethodCallHandler {
   private lateinit var channel : MethodChannel
   private lateinit var context: Context
+  private lateinit var storageCipher: StorageCipher18Implementation
+
+
+  fun initInstance(context: Context, tag: String){
+    if (!::storageCipher.isInitialized){
+      storageCipher = StorageCipher18Implementation(context, tag)
+    }
+  }
 
   override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
     channel = MethodChannel(flutterPluginBinding.binaryMessenger, "flutter_keystore")
@@ -24,23 +30,21 @@ class FlutterKeystorePlugin: FlutterPlugin, MethodCallHandler {
   }
 
   override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
-    var message = call.argument<Object>("message")!!
-    var tag = call.argument<String>("tag")!!
-    var authRequired = call.argument<Boolean?>("authRequired")
+    val message = call.argument<Any>("message")!!
+    val tag = call.argument<String>("tag")!!
+    val authRequired = call.argument<Boolean?>("authRequired")
+
+    initInstance(context, tag)
 
     when(call.method){
-      "getPlatformVersion" -> {
-        result.success("Android ${android.os.Build.VERSION.RELEASE}")
-      }
       "encrypt" -> {
-        var encrypted = authRequired?.let {
-          encrypt(context, tag,
-            it, (message as String).toByteArray(Charsets.UTF_8))
+        val encrypted = authRequired?.let {
+          storageCipher.encrypt((message as String).toByteArray(Charsets.UTF_8))
         }
         result.success(encrypted)
       }
       "decrypt" -> {
-        var decrypted = decrypt(context, message as ByteArray, tag)
+        val decrypted = storageCipher.decrypt(message as ByteArray)
         result.success(String(decrypted))
       }
       else -> {

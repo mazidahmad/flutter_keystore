@@ -5,10 +5,9 @@ import android.security.keystore.KeyInfo
 import android.security.keystore.KeyProperties
 import android.util.Log
 import mvzd.flutter_keystore.PreferencesHelper
+import mvzd.flutter_keystore.ciphers.StorageCipher18Implementation
 import java.security.KeyPairGenerator
 import java.security.KeyStore
-import java.security.PrivateKey
-import java.security.PublicKey
 import java.security.spec.ECGenParameterSpec
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -40,7 +39,8 @@ class Core {
                 var key = getSecretKey(tag)
                 if (key == null){
 //                    makeAndStorePrivateKey(tag, authRequired)
-                    generateSecretKey(tag, authRequired)
+//                    generateSecretKey(tag, authRequired)
+//                    generateECKeyPair(tag, authRequired)
                     key = getSecretKey(tag)
                 }
                 return key!!
@@ -63,6 +63,21 @@ class Core {
                 val kp = kpg.generateKeyPair()
         }
 
+        private fun generateECKeyPair(tag: String, authRequired: Boolean) {
+            val kpg: KeyPairGenerator = KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_EC, KEYSTORE_PROVIDER_ANDROID)
+            val keyGenParameterSpec =
+                KeyGenParameterSpec.Builder(
+                    tag,
+                    KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+                    .setAlgorithmParameterSpec(ECGenParameterSpec("secp256r1"))
+                    .setDigests(KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA512)
+                    .setUserAuthenticationRequired(authRequired) // 2
+//                    .setUserAuthenticationValidityDurationSeconds(120) //3
+                    .build()
+            kpg.initialize(keyGenParameterSpec)
+            val kp = kpg.generateKeyPair()
+        }
+
         private fun getCipher(): Cipher {
             return Cipher.getInstance(KeyProperties.KEY_ALGORITHM_AES + "/"
                     + KeyProperties.BLOCK_MODE_GCM + "/"
@@ -80,7 +95,7 @@ class Core {
 //                    .setUserAuthenticationValidityDurationSeconds(120) //3
                     .build()
             val keyGenerator = KeyGenerator.getInstance(
-                KeyProperties.KEY_ALGORITHM_AES, KEYSTORE_PROVIDER_ANDROID) // 4
+                KeyProperties.KEY_ALGORITHM_EC, KEYSTORE_PROVIDER_ANDROID) // 4
             keyGenerator.init(keyGenParameterSpec)
             keyGenerator.generateKey()
         }

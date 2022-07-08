@@ -26,7 +26,6 @@ abstract class FlutterKeystorePlatform extends PlatformInterface {
     _instance = instance;
   }
 
-  Future<String?> getPlatformVersion();
   Future<Uint8List?> encrypt({required AccessControl accessControl, required String message});
   Future<String?> decrypt({required Uint8List message, required AccessControl accessControl});
   // Future<String?> getPublicKey();
