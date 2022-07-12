@@ -4,11 +4,14 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyInfo
 import android.security.keystore.KeyProperties
 import android.util.Log
+import android.view.View
+
 import mvzd.flutter_keystore.PreferencesHelper
 import mvzd.flutter_keystore.ciphers.StorageCipher18Implementation
 import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.spec.ECGenParameterSpec
+import java.util.concurrent.Executors
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -18,10 +21,6 @@ import javax.crypto.spec.GCMParameterSpec
 class Core {
     companion object {
         private const val KEYSTORE_PROVIDER_ANDROID = "AndroidKeyStore"
-        private const val TYPE_RSA = "RSA"
-        private const val ivSize = 16
-        private const val keySize = 16
-        private const val KEY_ALGORITHM = "AES"
 
         private fun getSecretKey(tag: String): SecretKey? {
             return try{
@@ -100,30 +99,30 @@ class Core {
             keyGenerator.generateKey()
         }
 
-        fun encrypt(context: Context, tag: String, authRequired: Boolean = true, data: ByteArray): ByteArray {
-            val secretKey = prepareSecretKey(tag, authRequired)
-            val cipher = getCipher()
-            cipher.init(Cipher.ENCRYPT_MODE, secretKey)
-            val ivParameters = cipher.parameters.getParameterSpec(GCMParameterSpec::class.java)
-            val iv = ivParameters.iv
-            PreferencesHelper.saveIV(context, iv)
-            return cipher.doFinal(data)
-        }
-
-        fun decrypt(context: Context, data: ByteArray, key: String): ByteArray {
-            val cipher = getCipher()
-            val secretKey = getSecretKey(key)
-            val info = SecretKeyFactory.getInstance(KeyProperties.KEY_ALGORITHM_AES, KEYSTORE_PROVIDER_ANDROID)
-                .getKeySpec(secretKey, KeyInfo::class.java) as KeyInfo
-            val securityLevel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                Log.d("CORE", "Security Level : " + info.securityLevel)
-            } else {
-                TODO("VERSION.SDK_INT < S")
-            }
-            val iv = PreferencesHelper.iv(context)
-            val ivParameters = GCMParameterSpec(128, iv)
-            cipher.init(Cipher.DECRYPT_MODE, secretKey, ivParameters)
-            return cipher.doFinal(data)
-        }
+//        fun encrypt(context: Context, tag: String, authRequired: Boolean = true, data: ByteArray): ByteArray {
+//            val secretKey = prepareSecretKey(tag, authRequired)
+//            val cipher = getCipher()
+//            cipher.init(Cipher.ENCRYPT_MODE, secretKey)
+//            val ivParameters = cipher.parameters.getParameterSpec(GCMParameterSpec::class.java)
+//            val iv = ivParameters.iv
+//            PreferencesHelper.saveIV(context, iv)
+//            return cipher.doFinal(data)
+//        }
+//
+//        fun decrypt(context: Context, data: ByteArray, key: String): ByteArray {
+//            val cipher = getCipher()
+//            val secretKey = getSecretKey(key)
+//            val info = SecretKeyFactory.getInstance(KeyProperties.KEY_ALGORITHM_AES, KEYSTORE_PROVIDER_ANDROID)
+//                .getKeySpec(secretKey, KeyInfo::class.java) as KeyInfo
+//            val securityLevel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+//                Log.d("CORE", "Security Level : " + info.securityLevel)
+//            } else {
+//                TODO("VERSION.SDK_INT < S")
+//            }
+//            val iv = PreferencesHelper.iv(context)
+//            val ivParameters = GCMParameterSpec(128, iv)
+//            cipher.init(Cipher.DECRYPT_MODE, secretKey, ivParameters)
+//            return cipher.doFinal(data)
+//        }
     }
 }

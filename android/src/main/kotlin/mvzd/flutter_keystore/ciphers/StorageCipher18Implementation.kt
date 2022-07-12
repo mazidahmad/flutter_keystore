@@ -19,10 +19,11 @@ class StorageCipher18Implementation: StorageCipher {
     private var cipher: Cipher? = null
     private var secureRandom: SecureRandom? = null
     private var secretKey: Key? = null
+    private var rsaCipher: RSACipher18Implementation? = null
 
     constructor(context: Context, tag: String) {
         secureRandom = SecureRandom()
-        val rsaCipher = RSACipher18Implementation(context, tag)
+        rsaCipher = RSACipher18Implementation(context, tag)
         val preferences =
             context.getSharedPreferences(SHARED_PREFERENCES_NAME, Context.MODE_PRIVATE)
         val editor = preferences.edit()
@@ -32,7 +33,7 @@ class StorageCipher18Implementation: StorageCipher {
             val encrypted: ByteArray
             try {
                 encrypted = Base64.decode(aesKey, Base64.DEFAULT)
-                secretKey = rsaCipher.unwrap(encrypted, KEY_ALGORITHM)
+                secretKey = rsaCipher!!.unwrap(encrypted, KEY_ALGORITHM)
                 return
             } catch (e: Exception) {
                 Log.e("StorageCipher18Impl", "unwrap key failed", e)
@@ -41,7 +42,7 @@ class StorageCipher18Implementation: StorageCipher {
         val key = ByteArray(keySize)
         secureRandom!!.nextBytes(key)
         secretKey = SecretKeySpec(key, KEY_ALGORITHM)
-        val encryptedKey = rsaCipher.wrap(secretKey)
+        val encryptedKey = rsaCipher!!.wrap(secretKey)
         editor.putString(AES_PREFERENCES_KEY, Base64.encodeToString(encryptedKey, Base64.DEFAULT))
         editor.apply()
     }

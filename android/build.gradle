@@ -3,6 +3,7 @@ version '1.0-SNAPSHOT'
 
 buildscript {
     ext.kotlin_version = '1.6.10'
+    ext.biometric_version = '1.0.1'
     repositories {
         google()
         mavenCentral()
@@ -47,4 +48,5 @@ android {
 
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+    implementation "androidx.biometric:biometric:$biometric_version"
 }

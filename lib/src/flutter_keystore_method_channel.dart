@@ -26,7 +26,8 @@ class MethodChannelFlutterKeystore extends FlutterKeystorePlatform {
   Future<String?> decrypt({required Uint8List message, required AccessControl accessControl}) async{
     final result = await methodChannel.invokeMethod<String?>('decrypt', {
       'message': message,
-      'tag': accessControl.tag
+      'tag': accessControl.tag,
+      'authRequired': accessControl.setUserAuthenticatedRequired
     });
     return result;
   }

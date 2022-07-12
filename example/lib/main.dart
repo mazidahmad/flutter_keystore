@@ -32,11 +32,12 @@ class _MyAppState extends State<MyApp> {
   Uint8List encryptedWithPublicKey = Uint8List(0);
   String decrypted = "";
 
-  final AccessControl _accessControl = AccessControl(tag: "keychain-coinbit.privateKey", setUserAuthenticatedRequired: false);
+  late AccessControl _accessControl;
 
   @override
   void initState() {
     super.initState();
+    _accessControl = AccessControl(tag: _isRequiresBiometric ? tagBiometric : tag, setUserAuthenticatedRequired: _isRequiresBiometric);
   }
 
   void encrypt(String message) {
@@ -76,6 +77,7 @@ class _MyAppState extends State<MyApp> {
                     _isRequiresBiometric = value;
                     encrypted = Uint8List(0);
                     decrypted = "";
+                    _accessControl = AccessControl(tag: _isRequiresBiometric ? tagBiometric : tag, setUserAuthenticatedRequired: _isRequiresBiometric);
                   });
                 }),
               ],

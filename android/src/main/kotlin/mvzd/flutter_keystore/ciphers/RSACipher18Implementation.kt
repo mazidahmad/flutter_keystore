@@ -11,6 +11,7 @@ import java.security.*
 import java.security.spec.AlgorithmParameterSpec
 import java.util.*
 import javax.crypto.Cipher
+import javax.crypto.SecretKey
 import javax.security.auth.x500.X500Principal
 
 class RSACipher18Implementation {
@@ -57,6 +58,14 @@ class RSACipher18Implementation {
                 Log.d("CreateKey", "This device doesn't support StrongBox")
                 createKeys(false)
             }
+        }
+    }
+
+    fun getSecretKey(): PrivateKey? {
+        return try{
+           getPrivateKey()
+        }catch (_: Exception){
+            null
         }
     }
 
@@ -117,6 +126,14 @@ class RSACipher18Implementation {
                 .setCertificateSerialNumber(BigInteger.valueOf(1))
                 .setCertificateNotBefore(start.time)
                 .setCertificateNotAfter(end.time)
+                .setUserAuthenticationRequired(true)
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                builder.setInvalidatedByBiometricEnrollment(true)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                builder.setUserAuthenticationParameters(30, KeyProperties.AUTH_BIOMETRIC_STRONG)
+            }
             if (setIsStrongBox) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                     builder.setIsStrongBoxBacked(true)
