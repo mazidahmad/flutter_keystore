@@ -16,7 +16,14 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import mvzd.flutter_keystore.ciphers.StorageCipher18Implementation
-import java.nio.charset.Charset
+
+
+class MethodCallException(
+  val errorCode: String,
+  val errorMessage: String?,
+  val errorDetails: Any? = null
+) : Exception(errorMessage ?: errorCode)
+
 
 /** FlutterKeystorePlugin */
 class FlutterKeystorePlugin: FlutterPlugin, ActivityAware, MethodCallHandler {
@@ -25,20 +32,15 @@ class FlutterKeystorePlugin: FlutterPlugin, ActivityAware, MethodCallHandler {
   private lateinit var context: Context
   private lateinit var storageCipher: StorageCipher18Implementation
 
-//  private var attachedActivity: FragmentActivity? = null
-//  private val biometricManager by lazy { BiometricManager.from(context) }
-
   private lateinit var cryptographyManager: CryptographyManager
-  private var readyToEncrypt: Boolean = false
   private lateinit var biometricPrompt: BiometricPrompt
   private lateinit var promptInfo: BiometricPrompt.PromptInfo
   private var message: String = ""
   private var data: ByteArray? = null
-  private var mode: CipherMode = CipherMode.ENCRYPT
   private var fragmentActivity: FragmentActivity? = null
 
 
-  fun initInstance(context: Context, tag: String){
+  private fun initInstance(context: Context, tag: String){
     if (!::storageCipher.isInitialized){
       storageCipher = StorageCipher18Implementation(context, tag)
     }
@@ -49,13 +51,27 @@ class FlutterKeystorePlugin: FlutterPlugin, ActivityAware, MethodCallHandler {
     channel.setMethodCallHandler(this)
     context = flutterPluginBinding.applicationContext
     cryptographyManager = CryptographyManager()
-    promptInfo = createPromptInfo()
   }
 
   override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
     val message = call.argument<Any>("message")!!
     val tag = call.argument<String>("tag")!!
-    val authRequired = call.argument<Boolean?>("authRequired")
+    val authRequired = call.argument<Boolean>("authRequired")
+    val info = call.argument<Map<String, Any>?>("androidPromptInfo")
+
+    initInstance(context, tag)
+
+    if (info != null) {
+      promptInfo = createPromptInfo(info)
+    }else{
+      promptInfo = createPromptInfo(mapOf<String, Any>(
+        "title" to "Authenticate",
+        "subtitle" to "Biometric authentication to app",
+        "description" to "Validate fingerprint to continue",
+        "confirmationRequired" to false,
+        "negativeButton" to "Cancel"
+      ))
+    }
 
     if (message is ByteArray){
       this.data = message
@@ -63,58 +79,30 @@ class FlutterKeystorePlugin: FlutterPlugin, ActivityAware, MethodCallHandler {
       this.message = message as String
     }
 
-    initInstance(context, tag)
-
     fun <T> requiredArgument(name: String) =
       call.argument<T>(name) ?: throw MethodCallException(
         "MissingArgument",
         "Missing required argument '$name'"
       )
 
-    val getAndroidPromptInfo = {
-      requiredArgument<Map<String, Any>>("PARAM_ANDROID_PROMPT_INFO").let {
-        AndroidPromptInfo(
-//          title = it["title"] as String,
-//          subtitle = it["subtitle"] as String?,
-//          description = it["description"] as String?,
-//          negativeButton = it["negativeButton"] as String,
-//          confirmationRequired = it["confirmationRequired"] as Boolean,
-          title = "Biometric Validate",
-          subtitle = "Biometric for app",
-          description = "Confirm biometric to continue",
-          negativeButton = "Use password or passcode",
-          confirmationRequired = false,
-        )
-      }
-    }
-
     when(call.method){
       "encrypt" -> {
-//        val encrypted = authRequired?.let {
-//          storageCipher.encrypt((message as String).toByteArray(Charsets.UTF_8))
-        mode = CipherMode.ENCRYPT
-//        if(authRequired == true) {
-//          biometricPrompt = createBiometricPrompt(fragmentActivity!!, result)
-//          authenticateToEncrypt(context, tag)
-////          result.success(this.data!!)
-//        }else{
           this.data = storageCipher.encrypt((this.message as String).toByteArray(Charsets.UTF_8))
           result.success(this.data)
-//        }
       }
       "decrypt" -> {
-//        val decrypted = storageCipher.decrypt(message as ByteArray)
-//        result.success(String(decrypted))
-        mode = CipherMode.DECRYPT
         if(authRequired == true) {
-          biometricPrompt = createBiometricPrompt(fragmentActivity!!, result)
-          authenticateToDecrypt(context,tag, this.data!!)
+          biometricPrompt = createBiometricPrompt(fragmentActivity!!){
+            this.data = storageCipher.decrypt(this.data!!)
+            this.message = String(this.data!!)
+            result.success(this.message)
+          }
+          authenticateToDecrypt(context)
         }else{
           this.data = storageCipher.decrypt(this.data!!)
           this.message = String(this.data!!)
           result.success(this.message)
         }
-//        result.success(this.message)
       }
       else -> {
         result.notImplemented()
@@ -126,7 +114,7 @@ class FlutterKeystorePlugin: FlutterPlugin, ActivityAware, MethodCallHandler {
     channel.setMethodCallHandler(null)
   }
 
-  private fun createBiometricPrompt(context: FragmentActivity, resultCall: Result): BiometricPrompt {
+  private fun createBiometricPrompt(context: FragmentActivity, onSuccess: () -> Unit): BiometricPrompt {
     val executor = ContextCompat.getMainExecutor(context)
 
     val callback = object : BiometricPrompt.AuthenticationCallback() {
@@ -143,51 +131,31 @@ class FlutterKeystorePlugin: FlutterPlugin, ActivityAware, MethodCallHandler {
       override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
         super.onAuthenticationSucceeded(result)
         Log.d(TAG, "Authentication was successful")
-        processData(result.cryptoObject, resultCall)
+        onSuccess()
       }
     }
 
     return BiometricPrompt(context, executor, callback)
   }
 
-  private fun createPromptInfo(): BiometricPrompt.PromptInfo {
+  private fun createPromptInfo(info: Map<String, Any>): BiometricPrompt.PromptInfo {
     return BiometricPrompt.PromptInfo.Builder()
-      .setTitle("Confirm Biometric") // e.g. "Sign in"
-      .setSubtitle("Biometric for app") // e.g. "Biometric for My App"
-      .setDescription("Confirm biometric to continue") // e.g. "Confirm biometric to continue"
-      .setConfirmationRequired(false)
-      .setNegativeButtonText("User Account Password") // e.g. "Use Account Password"
-      // .setDeviceCredentialAllowed(true) // Allow PIN/pattern/password authentication.
-      // Also note that setDeviceCredentialAllowed and setNegativeButtonText are
-      // incompatible so that if you uncomment one you must comment out the other
+      .setTitle(info["title"] as String)
+      .setSubtitle(info["subtitle"] as String?)
+      .setDescription(info["description"] as String?)
+      .setConfirmationRequired(info["confirmationRequired"] as Boolean)
+      .setNegativeButtonText(info["negativeButton"] as String)
       .build()
-  }
-
-  private fun processData(cryptoObject: BiometricPrompt.CryptoObject?, result: Result) {
-    if (mode == CipherMode.ENCRYPT) {
-//      val encryptedData = cryptographyManager.encryptData(message, cryptoObject?.cipher!!)
-//      encryptedData.ciphertext
-//      this.data = encryptedData.initializationVector
-      this.data = storageCipher.encrypt((this.message as String).toByteArray(Charsets.UTF_8))
-      result.success(this.data)
-    } else {
-//      this.message = cryptographyManager.decryptData(data!!, cryptoObject?.cipher!!)
-      this.data = storageCipher.decrypt(this.data!!)
-      this.message = String(this.data!!)
-      result.success(this.message)
-    }
   }
 
   private fun authenticateToEncrypt(context: Context, tag: String) {
     if (BiometricManager.from(context).canAuthenticate() == BiometricManager
         .BIOMETRIC_SUCCESS) {
-//      val cipher = cryptographyManager.getInitializedCipherForEncryption(tag)
-//      biometricPrompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(cipher))
       biometricPrompt.authenticate(promptInfo)
     }
   }
 
-  private fun authenticateToDecrypt(context: Context, tag: String, data: ByteArray) {
+  private fun authenticateToDecrypt(context: Context) {
     if (BiometricManager.from(context).canAuthenticate() == BiometricManager
         .BIOMETRIC_SUCCESS) {
 //      val cipher = cryptographyManager.getInitializedCipherForDecryption(tag,data)
@@ -215,22 +183,4 @@ class FlutterKeystorePlugin: FlutterPlugin, ActivityAware, MethodCallHandler {
   override fun onDetachedFromActivity() {
   }
 }
-
-enum class CipherMode {
-  ENCRYPT, DECRYPT
-}
-
-data class AndroidPromptInfo(
-  val title: String,
-  val subtitle: String?,
-  val description: String?,
-  val negativeButton: String,
-  val confirmationRequired: Boolean
-)
-
-class MethodCallException(
-  val errorCode: String,
-  val errorMessage: String?,
-  val errorDetails: Any? = null
-) : Exception(errorMessage ?: errorCode)
 

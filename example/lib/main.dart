@@ -1,11 +1,8 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'dart:async';
 
-import 'package:flutter/services.dart';
 import 'package:flutter_keystore/flutter_keystore.dart';
-import 'package:flutter_keystore/src/model/access_control.dart';
 
 void main() {
   runApp(const MyApp());
@@ -33,11 +30,13 @@ class _MyAppState extends State<MyApp> {
   String decrypted = "";
 
   late AccessControl _accessControl;
+  late AndroidPromptInfo _androidPromptInfo;
 
   @override
   void initState() {
     super.initState();
-    _accessControl = AccessControl(tag: _isRequiresBiometric ? tagBiometric : tag, setUserAuthenticatedRequired: _isRequiresBiometric);
+    _androidPromptInfo = AndroidPromptInfo(title: "Confirm Biometric", confirmationRequired: false, negativeButton: "Cancel Auth");
+    _accessControl = AccessControl(tag: _isRequiresBiometric ? tagBiometric : tag, setUserAuthenticatedRequired: _isRequiresBiometric, androidPromptInfo: _androidPromptInfo);
   }
 
   void encrypt(String message) {
@@ -77,7 +76,7 @@ class _MyAppState extends State<MyApp> {
                     _isRequiresBiometric = value;
                     encrypted = Uint8List(0);
                     decrypted = "";
-                    _accessControl = AccessControl(tag: _isRequiresBiometric ? tagBiometric : tag, setUserAuthenticatedRequired: _isRequiresBiometric);
+                    _accessControl = _accessControl.copyWith(setUserAuthenticatedRequired: value);
                   });
                 }),
               ],

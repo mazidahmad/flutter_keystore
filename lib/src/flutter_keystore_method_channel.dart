@@ -17,7 +17,8 @@ class MethodChannelFlutterKeystore extends FlutterKeystorePlatform {
     final result = await methodChannel.invokeMethod<Uint8List?>('encrypt', {
       'tag': accessControl.tag,
       'message': message,
-      'authRequired': accessControl.setUserAuthenticatedRequired
+      'authRequired': accessControl.setUserAuthenticatedRequired,
+      'androidPromptInfo': accessControl.androidPromptInfo?.toMap()
     });
     return result;
   }
@@ -27,7 +28,8 @@ class MethodChannelFlutterKeystore extends FlutterKeystorePlatform {
     final result = await methodChannel.invokeMethod<String?>('decrypt', {
       'message': message,
       'tag': accessControl.tag,
-      'authRequired': accessControl.setUserAuthenticatedRequired
+      'authRequired': accessControl.setUserAuthenticatedRequired,
+      'androidPromptInfo': accessControl.androidPromptInfo?.toMap()
     });
     return result;
   }
