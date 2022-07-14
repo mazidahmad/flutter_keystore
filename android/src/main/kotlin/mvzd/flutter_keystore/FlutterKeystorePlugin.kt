@@ -218,7 +218,19 @@ class FlutterKeystorePlugin: FlutterPlugin, ActivityAware, MethodCallHandler {
       override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
         super.onAuthenticationSucceeded(result)
         Log.d(TAG, "Authentication was successful")
-        onSuccess()
+        try {
+          onSuccess()
+        }catch (e: Exception){
+          ui(onError) {
+            onError(
+              AuthenticationErrorInfo(
+                AuthenticationError.forCode(
+                  0
+                ), e.message!!
+              )
+            )
+          }
+        }
       }
     }
 

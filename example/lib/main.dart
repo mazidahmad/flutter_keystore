@@ -59,6 +59,7 @@ class _MyAppState extends State<MyApp> {
       if (e.message != null && e.message!.toLowerCase().contains("cancel")){
         print("Calcelled by user");
       }
+      print(e.message);
     }catch(e){
       print(e);
     }
@@ -103,27 +104,30 @@ class _MyAppState extends State<MyApp> {
             Text(
                 decrypted
             ),
-            Divider(),
             TextButton(onPressed: () {
-              // removeKey();
-            }, child: Text("reset key")),
-            Divider(),
-            TextButton(onPressed: () {
-              // cobaError();
-            }, child: Text("coba Error")),
-            Divider(),
-            Text(publicKey),
-            TextButton(onPressed: () {
-              // getPublicKey();
-            }, child: Text("get public key")),
-            TextButton(onPressed: () {
-              // encryptWithPublicKey(input.text);
-            }, child: Text("encrypt with public key")),
-            Text(encryptedWithPublicKey.toString()),
-            TextButton(onPressed: () {
-              decrypted = "";
-              // decrypt(encryptedWithPublicKey);
-            }, child: Text("decrypt from encryptedWithPublicKey")),
+              decrypt(Uint8List.fromList(("dgasydtasid7tasuidytasvduyas").codeUnits));
+            }, child: Text("decrypt false!")),
+            // Divider(),
+            // TextButton(onPressed: () {
+            //   // removeKey();
+            // }, child: Text("reset key")),
+            // Divider(),
+            // TextButton(onPressed: () {
+            //   // cobaError();
+            // }, child: Text("coba Error")),
+            // Divider(),
+            // Text(publicKey),
+            // TextButton(onPressed: () {
+            //   // getPublicKey();
+            // }, child: Text("get public key")),
+            // TextButton(onPressed: () {
+            //   // encryptWithPublicKey(input.text);
+            // }, child: Text("encrypt with public key")),
+            // Text(encryptedWithPublicKey.toString()),
+            // TextButton(onPressed: () {
+            //   decrypted = "";
+            //   // decrypt(encryptedWithPublicKey);
+            // }, child: Text("decrypt from encryptedWithPublicKey")),
           ],
         ),
       ),
