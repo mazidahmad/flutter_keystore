@@ -1,15 +1,35 @@
+
 # flutter_keystore
 
-A new Flutter plugin project.
+  
+
+A library to encrypt and decrypt data using Android Keystore with TEE/StrongBox. 
+  
 
 ## Getting Started
 
-This project is a starting point for a Flutter
-[plug-in package](https://flutter.dev/developing-packages/),
-a specialized package that includes platform-specific implementation code for
-Android and/or iOS.
+Instalation
 
-For help getting started with Flutter development, view the
-[online documentation](https://flutter.dev/docs), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+ - Requirements :
+	 - Android API Level >= 23
+	 - Make sure to use kotlin version 1.4.31
+	 - MainActivity should to extends FlutterFragmentActivity
+	 
+	 
+ - Usage
+ 
+Create Object
+
+    import  'package:flutter_keystore/flutter_keystore.dart';
+    
+    final flutterKeystore = FlutterKeystore()
+	
+Encrypt & Decrypt
+
+    var promptInfo = AndroidPromptInfo(title:  "Confirm Biometric", confirmationRequired:  false, negativeButton:  "Cancel Auth");
+    var accessControl = AccessControl(tag: "TAG", setUserAuthenticatedRequired:  true, androidPromptInfo:  promptInfo);
+ 
+    var encryptedData = await flutterKeystore.encrypt(accessControl: accessControl, message: message);
+    
+    var decryptedData = await  flutterKeystore.decrypt(message: encryptedData, accessControl:  accessControl);
 
