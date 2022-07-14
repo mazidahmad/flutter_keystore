@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:flutter_keystore/flutter_keystore.dart';
 
@@ -47,12 +48,20 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
-  void decrypt(Uint8List data) {
-    _flutterKeystorePlugin.decrypt(message: data, accessControl: _accessControl).then((value){
-      setState(() {
-        decrypted = value ?? "";
+  void decrypt(Uint8List data) async{
+    try {
+      await _flutterKeystorePlugin.decrypt(message: data, accessControl: _accessControl).then((value){
+        setState(() {
+          decrypted = value ?? "";
+        });
       });
-    });
+    } on PlatformException catch(e) {
+      if (e.message != null && e.message!.toLowerCase().contains("cancel")){
+        print("Calcelled by user");
+      }
+    }catch(e){
+      print(e);
+    }
   }
 
   @override
