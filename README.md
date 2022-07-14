@@ -19,12 +19,15 @@ Instalation
  - Usage
  
 Create Object
+```dart
 
     import  'package:flutter_keystore/flutter_keystore.dart';
     
     final flutterKeystore = FlutterKeystore()
+```
 	
 Encrypt & Decrypt
+```dart
 
     var promptInfo = AndroidPromptInfo(title:  "Confirm Biometric", confirmationRequired:  false, negativeButton:  "Cancel Auth");
     var accessControl = AccessControl(tag: "TAG", setUserAuthenticatedRequired:  true, androidPromptInfo:  promptInfo);
@@ -32,4 +35,4 @@ Encrypt & Decrypt
     var encryptedData = await flutterKeystore.encrypt(accessControl: accessControl, message: message);
     
     var decryptedData = await  flutterKeystore.decrypt(message: encryptedData, accessControl:  accessControl);
-
+```
