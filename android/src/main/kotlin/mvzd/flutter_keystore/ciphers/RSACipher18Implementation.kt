@@ -20,10 +20,10 @@ class RSACipher18Implementation {
     private var KEY_ALIAS: String? = null
     private var context: Context? = null
 
-    constructor(context: Context, tag: String) {
+    constructor(context: Context, tag: String, authRequired: Boolean) {
         KEY_ALIAS = context.packageName + ".$tag"
         this.context = context
-        checkAndGeneratePrivateKey(context)
+        checkAndGeneratePrivateKey(authRequired)
     }
 
     fun wrap(key: Key?): ByteArray? {
@@ -47,16 +47,16 @@ class RSACipher18Implementation {
         )
     }
 
-    private fun checkAndGeneratePrivateKey(context: Context) {
+    private fun checkAndGeneratePrivateKey(authRequired: Boolean) {
         val ks = KeyStore.getInstance(KEYSTORE_PROVIDER_ANDROID)
         ks.load(null)
         val privateKey = ks.getKey(KEY_ALIAS, null)
         if (privateKey == null) {
             try {
-                createKeys(true)
+                createKeys(true, authRequired)
             } catch (_: Exception) {
                 Log.d("CreateKey", "This device doesn't support StrongBox")
-                createKeys(false)
+                createKeys(false, authRequired)
             }
         }
     }
@@ -102,7 +102,7 @@ class RSACipher18Implementation {
         return cert.publicKey ?: throw java.lang.Exception("No key found under alias: $KEY_ALIAS")
     }
 
-    private fun createKeys(setIsStrongBox: Boolean) {
+    private fun createKeys(setIsStrongBox: Boolean, authRequired: Boolean) {
         val localeBeforeFakingEnglishLocale = Locale.getDefault()
         try {
             setLocale(Locale.ENGLISH)
@@ -126,7 +126,7 @@ class RSACipher18Implementation {
                 .setCertificateSerialNumber(BigInteger.valueOf(1))
                 .setCertificateNotBefore(start.time)
                 .setCertificateNotAfter(end.time)
-                .setUserAuthenticationRequired(true)
+                .setUserAuthenticationRequired(authRequired)
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 builder.setInvalidatedByBiometricEnrollment(true)

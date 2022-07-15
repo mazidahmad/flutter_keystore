@@ -90,13 +90,6 @@ class FlutterKeystorePlugin: FlutterPlugin, ActivityAware, MethodCallHandler {
   private val executor: ExecutorService by lazy { Executors.newSingleThreadExecutor() }
   private val handler: Handler by lazy { Handler(Looper.getMainLooper()) }
 
-
-  private fun initInstance(context: Context, tag: String){
-    if (!::storageCipher.isInitialized){
-      storageCipher = StorageCipher18Implementation(context, tag)
-    }
-  }
-
   override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
     channel = MethodChannel(flutterPluginBinding.binaryMessenger, "flutter_keystore")
     channel.setMethodCallHandler(this)
@@ -106,12 +99,35 @@ class FlutterKeystorePlugin: FlutterPlugin, ActivityAware, MethodCallHandler {
 
   override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
     try {
+      val resultError: ErrorCallback = { errorInfo ->
+        result.error(
+          "AuthError:${errorInfo.error}",
+          errorInfo.message.toString(),
+          errorInfo.errorDetails
+        )
+        logger.error("AuthError: $errorInfo")
+
+      }
+
+      fun <T> requiredArgument(name: String) =
+        call.argument<T>(name) ?: throw MethodCallException(
+          "MissingArgument",
+          "Missing required argument '$name'"
+        )
+
+      @UiThread
+      fun withAuth(
+        @WorkerThread cb: () -> Unit
+      ) {
+        authenticate(promptInfo, {
+          cb()
+        },onError = resultError)
+      }
+
       val message = call.argument<Any>("message")!!
       val tag = call.argument<String>("tag")!!
-      val authRequired = call.argument<Boolean>("authRequired")
+      val authRequired = requiredArgument<Boolean>("authRequired")
       val info = call.argument<Map<String, Any>?>("androidPromptInfo")
-
-      initInstance(context, tag)
 
       if (info != null) {
         promptInfo = createPromptInfo(info)
@@ -131,53 +147,49 @@ class FlutterKeystorePlugin: FlutterPlugin, ActivityAware, MethodCallHandler {
         this.message = message as String
       }
 
-      fun <T> requiredArgument(name: String) =
-        call.argument<T>(name) ?: throw MethodCallException(
-          "MissingArgument",
-          "Missing required argument '$name'"
-        )
-
-      val resultError: ErrorCallback = { errorInfo ->
-        result.error(
-          "AuthError:${errorInfo.error}",
-          errorInfo.message.toString(),
-          errorInfo.errorDetails
-        )
-        logger.error("AuthError: $errorInfo")
-
-      }
-
       @UiThread
-      fun withAuth(
-        @WorkerThread cb: () -> Unit
-      ) {
-        authenticate(promptInfo, {
-          cb()
-        },onError = resultError)
-      }
-
-      when(call.method){
-        "encrypt" -> {
-          this.data = storageCipher.encrypt((this.message as String).toByteArray(Charsets.UTF_8))
-          result.success(this.data)
-        }
-        "decrypt" -> {
-          if(authRequired == true) {
-            withAuth {
+      fun onProcess(){
+        when(call.method){
+          "encrypt" -> {
+            this.data = storageCipher.encrypt((this.message).toByteArray(Charsets.UTF_8))
+            result.success(this.data)
+          }
+          "decrypt" -> {
+            if(authRequired == true) {
+              withAuth {
+                this.data = storageCipher.decrypt(this.data!!)
+                this.message = String(this.data!!)
+                result.success(this.message)
+              }
+            }else{
               this.data = storageCipher.decrypt(this.data!!)
               this.message = String(this.data!!)
               result.success(this.message)
             }
-          }else{
-            this.data = storageCipher.decrypt(this.data!!)
-            this.message = String(this.data!!)
-            result.success(this.message)
+          }
+          else -> {
+            result.notImplemented()
           }
         }
-        else -> {
-          result.notImplemented()
-        }
       }
+
+      if (!::storageCipher.isInitialized){
+        if (authRequired){
+          withAuth {
+            storageCipher = StorageCipher18Implementation(context, tag, authRequired)
+            onProcess()
+          }
+        }else{
+          storageCipher = StorageCipher18Implementation(context, tag, authRequired)
+          onProcess()
+        }
+      }else {
+        onProcess()
+      }
+
+
+
+
     }catch (e: MethodCallException) {
       logger.error(e) { "Error while processing method call ${call.method}" }
       result.error(e.errorCode, e.errorMessage, e.errorDetails)

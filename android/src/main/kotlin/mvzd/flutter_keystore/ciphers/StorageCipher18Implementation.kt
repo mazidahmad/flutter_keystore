@@ -21,9 +21,9 @@ class StorageCipher18Implementation: StorageCipher {
     private var secretKey: Key? = null
     private var rsaCipher: RSACipher18Implementation? = null
 
-    constructor(context: Context, tag: String) {
+    constructor(context: Context, tag: String, authRequired: Boolean) {
         secureRandom = SecureRandom()
-        rsaCipher = RSACipher18Implementation(context, tag)
+        rsaCipher = RSACipher18Implementation(context, tag, authRequired)
         val preferences =
             context.getSharedPreferences(SHARED_PREFERENCES_NAME, Context.MODE_PRIVATE)
         val editor = preferences.edit()
