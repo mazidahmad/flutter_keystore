@@ -38,10 +38,11 @@ class StorageCipher18Implementation: StorageCipher {
             } catch (e: Exception) {
                 Log.e("StorageCipher18Impl", "unwrap key failed", e)
             }
+        }else {
+            val key = ByteArray(keySize)
+            secureRandom!!.nextBytes(key)
+            secretKey = SecretKeySpec(key, KEY_ALGORITHM)
         }
-        val key = ByteArray(keySize)
-        secureRandom!!.nextBytes(key)
-        secretKey = SecretKeySpec(key, KEY_ALGORITHM)
         val encryptedKey = rsaCipher!!.wrap(secretKey)
         editor.putString(AES_PREFERENCES_KEY, Base64.encodeToString(encryptedKey, Base64.DEFAULT))
         editor.apply()

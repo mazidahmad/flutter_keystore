@@ -186,10 +186,6 @@ class FlutterKeystorePlugin: FlutterPlugin, ActivityAware, MethodCallHandler {
       }else {
         onProcess()
       }
-
-
-
-
     }catch (e: MethodCallException) {
       logger.error(e) { "Error while processing method call ${call.method}" }
       result.error(e.errorCode, e.errorMessage, e.errorDetails)

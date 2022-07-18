@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:flutter_keystore/flutter_keystore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(const MyApp());
@@ -30,37 +31,64 @@ class _MyAppState extends State<MyApp> {
   Uint8List encryptedWithPublicKey = Uint8List(0);
   String decrypted = "";
 
+  List<String> _listData = [];
+
   late AccessControl _accessControl;
   late AndroidPromptInfo _androidPromptInfo;
+
+  void saveData() async {
+    var prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList("datas", _listData);
+  }
+
+  void getData() async {
+    var prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _listData = prefs.getStringList("datas") ?? [];
+    });
+  }
 
   @override
   void initState() {
     super.initState();
-    _androidPromptInfo = AndroidPromptInfo(title: "Confirm Biometric", confirmationRequired: false, negativeButton: "Cancel Auth");
-    _accessControl = AccessControl(tag: _isRequiresBiometric ? tagBiometric : tag, setUserAuthenticatedRequired: _isRequiresBiometric, androidPromptInfo: _androidPromptInfo);
+    getData();
+    _androidPromptInfo = AndroidPromptInfo(
+        title: "Confirm Biometric",
+        confirmationRequired: false,
+        negativeButton: "Cancel Auth");
+    _accessControl = AccessControl(
+        tag: _isRequiresBiometric ? tagBiometric : tag,
+        setUserAuthenticatedRequired: _isRequiresBiometric,
+        androidPromptInfo: _androidPromptInfo);
   }
 
   void encrypt(String message) {
-    _flutterKeystorePlugin.encrypt(accessControl: _accessControl, message: message).then((value){
+    _flutterKeystorePlugin
+        .encrypt(accessControl: _accessControl, message: message)
+        .then((value) {
       setState(() {
         encrypted = value ?? Uint8List(0);
+        _listData.add(String.fromCharCodes(encrypted));
+        saveData();
       });
     });
   }
 
-  void decrypt(Uint8List data) async{
+  void decrypt(Uint8List data) async {
     try {
-      await _flutterKeystorePlugin.decrypt(message: data, accessControl: _accessControl).then((value){
+      await _flutterKeystorePlugin
+          .decrypt(message: data, accessControl: _accessControl)
+          .then((value) {
         setState(() {
           decrypted = value ?? "";
         });
       });
-    } on PlatformException catch(e) {
-      if (e.message != null && e.message!.toLowerCase().contains("cancel")){
+    } on PlatformException catch (e) {
+      if (e.message != null && e.message!.toLowerCase().contains("cancel")) {
         print("Calcelled by user");
       }
       print(e.message);
-    }catch(e){
+    } catch (e) {
       print(e);
     }
   }
@@ -72,7 +100,7 @@ class _MyAppState extends State<MyApp> {
         appBar: AppBar(
           title: const Text('Plugin example app'),
         ),
-        body: ListView(
+        body: Column(
           children: [
             TextField(
               controller: input,
@@ -80,33 +108,70 @@ class _MyAppState extends State<MyApp> {
             Row(
               children: [
                 const Text("Biometric"),
-                const SizedBox(width: 10,),
-                Switch(value: _isRequiresBiometric, onChanged: (value) {
-                  setState(() {
-                    _isRequiresBiometric = value;
-                    encrypted = Uint8List(0);
-                    decrypted = "";
-                    _accessControl = _accessControl.copyWith(setUserAuthenticatedRequired: value);
-                  });
-                }),
+                const SizedBox(
+                  width: 10,
+                ),
+                Switch(
+                    value: _isRequiresBiometric,
+                    onChanged: (value) {
+                      setState(() {
+                        _isRequiresBiometric = value;
+                        encrypted = Uint8List(0);
+                        decrypted = "";
+                        _accessControl = _accessControl.copyWith(
+                            setUserAuthenticatedRequired: value);
+                      });
+                    }),
               ],
             ),
-            TextButton(onPressed: () {
-              encrypt(input.text);
-              // input.clear();
-            }, child: Text("encrypt!")),
-            Text(
-                encrypted.toString()
+            TextButton(
+                onPressed: () {
+                  encrypt(input.text);
+                  // input.clear();
+                },
+                child: Text("encrypt!")),
+            Text(encrypted.toString()),
+            TextButton(
+                onPressed: () {
+                  decrypt(encrypted);
+                },
+                child: Text("decrypt!")),
+            Text(decrypted),
+            TextButton(
+                onPressed: () {
+                  decrypt(Uint8List.fromList(
+                      ("dgasydtasid7tasuidytasvduyas").codeUnits));
+                },
+                child: Text("decrypt false!")),
+            SizedBox(
+              height: 20,
             ),
-            TextButton(onPressed: () {
-              decrypt(encrypted);
-            }, child: Text("decrypt!")),
-            Text(
-                decrypted
+            Text("List Saved Data"),
+            Divider(),
+            Expanded(
+              child: ListView.builder(
+                itemCount: _listData.length,
+                itemBuilder: (_, idx) => Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(child: Text(_listData[idx])),
+                        SizedBox(
+                          width: 10,
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            decrypt(
+                                Uint8List.fromList((_listData[idx]).codeUnits));
+                          },
+                          child: Text("decrypt"),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
-            TextButton(onPressed: () {
-              decrypt(Uint8List.fromList(("dgasydtasid7tasuidytasvduyas").codeUnits));
-            }, child: Text("decrypt false!")),
             // Divider(),
             // TextButton(onPressed: () {
             //   // removeKey();
