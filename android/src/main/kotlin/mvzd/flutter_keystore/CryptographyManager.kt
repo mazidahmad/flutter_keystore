@@ -1,13 +1,19 @@
 package mvzd.flutter_keystore
 
+import android.content.Context
+import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
-import java.nio.charset.Charset
-import java.security.KeyStore
+import android.util.Base64
+import android.util.Log
+import java.math.BigInteger
+import java.security.*
+import java.security.spec.AlgorithmParameterSpec
+import java.util.*
 import javax.crypto.Cipher
-import javax.crypto.KeyGenerator
-import javax.crypto.SecretKey
-import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.SecretKeySpec
+import javax.security.auth.x500.X500Principal
 
 
 /**
@@ -32,88 +38,228 @@ interface CryptographyManager {
      * This method first gets or generates an instance of SecretKey and then initializes the Cipher
      * with the key. The secret key uses [ENCRYPT_MODE][Cipher.ENCRYPT_MODE] is used.
      */
-    fun getInitializedCipherForEncryption(keyName: String): Cipher
+    fun getInitializedCipherForEncryption(keyName: String, authRequired: Boolean): Cipher
 
     /**
      * This method first gets or generates an instance of SecretKey and then initializes the Cipher
      * with the key. The secret key uses [DECRYPT_MODE][Cipher.DECRYPT_MODE] is used.
      */
-    fun getInitializedCipherForDecryption(keyName: String, initializationVector: ByteArray): Cipher
+    fun getInitializedCipherForDecryption(keyName: String, initializationVector: ByteArray, authRequired: Boolean): Cipher
 
     /**
      * The Cipher created with [getInitializedCipherForEncryption] is used here
      */
-    fun encryptData(plaintext: String, cipher: Cipher): EncryptedData
+    fun encryptData(input: ByteArray, cipher: Cipher, keyName: String, authRequired: Boolean): ByteArray
 
     /**
      * The Cipher created with [getInitializedCipherForDecryption] is used here
      */
-    fun decryptData(ciphertext: ByteArray, cipher: Cipher): String
+    fun decryptData(input: ByteArray, cipher: Cipher,  keyName: String, authRequired: Boolean): ByteArray
 
+    fun resetConfiguration(keyName: String)
 }
 
-fun CryptographyManager(): CryptographyManager = CryptographyManagerImpl()
+fun CryptographyManager(context: Context): CryptographyManager = CryptographyManagerImpl(context)
 
-data class EncryptedData(val ciphertext: ByteArray, val initializationVector: ByteArray)
+private class CryptographyManagerImpl(context: Context) : CryptographyManager {
 
-private class CryptographyManagerImpl : CryptographyManager {
 
-    private val KEY_SIZE: Int = 256
-    val ANDROID_KEYSTORE = "AndroidKeyStore"
-    private val ENCRYPTION_BLOCK_MODE = KeyProperties.BLOCK_MODE_GCM
-    private val ENCRYPTION_PADDING = KeyProperties.ENCRYPTION_PADDING_NONE
-    private val ENCRYPTION_ALGORITHM = KeyProperties.KEY_ALGORITHM_AES
+    private val KEYSTORE_PROVIDER_ANDROID = "AndroidKeyStore"
+    private val TYPE_RSA = "RSA"
+    private var context: Context? = context
 
-    override fun getInitializedCipherForEncryption(keyName: String): Cipher {
-        val cipher = getCipher()
-        val secretKey = getOrCreateSecretKey(keyName)
-        cipher.init(Cipher.ENCRYPT_MODE, secretKey)
+    private val ivSize = 16
+    private val keySize = 16
+    private val KEY_ALGORITHM = "AES"
+    private val AES_PREFERENCES_KEY = "2f1cd779055f4212b9997520a948686f"
+    private val SHARED_PREFERENCES_NAME = "FlutterKeyStore"
+    private var secureRandom: SecureRandom? = null
+
+    init {
+        secureRandom = SecureRandom()
+    }
+
+    fun wrap(key: Key?, keyName: String): ByteArray? {
+        val publicKey: PublicKey = getPublicKey(keyName)
+        val cipher = getRsaCipher()
+        cipher.init(Cipher.WRAP_MODE, publicKey)
+        return cipher.wrap(key)
+    }
+
+    fun unwrap(wrappedKey: ByteArray?, cipher: Cipher, algorithm: String?): Key? {
+        return cipher.unwrap(wrappedKey, algorithm, Cipher.SECRET_KEY)
+    }
+
+    private fun getOrSaveAesKey(keyName: String, authRequired: Boolean): ByteArray{
+        val preferences =
+            context?.getSharedPreferences(SHARED_PREFERENCES_NAME, Context.MODE_PRIVATE)
+        val editor = preferences?.edit()
+        getOrCreateSecretKey(keyName, authRequired)
+        val aesKey = preferences?.getString(AES_PREFERENCES_KEY, null)
+        if (aesKey == null) {
+            val key = ByteArray(keySize)
+            secureRandom!!.nextBytes(key)
+            val secretKey = SecretKeySpec(key, KEY_ALGORITHM)
+
+            val encryptedKey = wrap(secretKey, keyName)
+            editor?.putString(AES_PREFERENCES_KEY, Base64.encodeToString(encryptedKey, Base64.DEFAULT))
+            editor?.apply()
+            return encryptedKey!!
+        }
+
+        return Base64.decode(aesKey, Base64.DEFAULT)
+    }
+
+    private fun getPublicKey(keyName: String): PublicKey {
+        val ks =
+            KeyStore.getInstance(KEYSTORE_PROVIDER_ANDROID)
+        ks.load(null)
+        val cert = ks.getCertificate(keyName)
+            ?: throw java.lang.Exception("No certificate found under alias: $keyName")
+        return cert.publicKey ?: throw java.lang.Exception("No key found under alias: $keyName")
+    }
+
+    override fun getInitializedCipherForEncryption(keyName: String, authRequired: Boolean): Cipher {
+        val cipher = getRsaCipher()
+        val secretKey = getOrCreateSecretKey(keyName, authRequired)
+        cipher.init(Cipher.UNWRAP_MODE, secretKey)
         return cipher
     }
 
-    override fun getInitializedCipherForDecryption(keyName: String, initializationVector: ByteArray): Cipher {
-        val cipher = getCipher()
-        val secretKey = getOrCreateSecretKey(keyName)
-        cipher.init(Cipher.DECRYPT_MODE, secretKey, GCMParameterSpec(128, initializationVector))
+    override fun getInitializedCipherForDecryption(keyName: String, initializationVector: ByteArray, authRequired: Boolean): Cipher {
+        val cipher = getRsaCipher()
+        val secretKey = getOrCreateSecretKey(keyName, authRequired)
+        cipher.init(Cipher.UNWRAP_MODE, secretKey)
         return cipher
     }
 
-    override fun encryptData(plaintext: String, cipher: Cipher): EncryptedData {
-        val ciphertext = cipher.doFinal(plaintext.toByteArray(Charset.forName("UTF-8")))
-        return EncryptedData(ciphertext,cipher.iv)
+    override fun encryptData(input: ByteArray, cipher: Cipher, keyName: String, authRequired: Boolean): ByteArray {
+        val encryptedAes = getOrSaveAesKey(keyName, authRequired)
+        val secretKey = unwrap(encryptedAes, cipher, KEY_ALGORITHM)
+        val iv = ByteArray(ivSize)
+        secureRandom!!.nextBytes(iv)
+        val ivParameterSpec = IvParameterSpec(iv)
+        val aesCipher = getCipher()
+        aesCipher.init(Cipher.ENCRYPT_MODE, secretKey, ivParameterSpec)
+        val payload = aesCipher.doFinal(input)
+        val combined = ByteArray(iv.size + payload.size)
+        System.arraycopy(iv, 0, combined, 0, iv.size)
+        System.arraycopy(payload, 0, combined, iv.size, payload.size)
+        return combined
     }
 
-    override fun decryptData(ciphertext: ByteArray, cipher: Cipher): String {
-        val plaintext = cipher.doFinal(ciphertext)
-        return String(plaintext, Charset.forName("UTF-8"))
+    override fun decryptData(input: ByteArray, cipher: Cipher,  keyName: String, authRequired: Boolean): ByteArray {
+        val encryptedAes = getOrSaveAesKey(keyName, authRequired)
+        val secretKey = unwrap(encryptedAes, cipher, KEY_ALGORITHM)
+        val iv = ByteArray(ivSize)
+        System.arraycopy(input, 0, iv, 0, iv.size)
+        val ivParameterSpec = IvParameterSpec(iv)
+        val payloadSize = input.size - ivSize
+        val payload = ByteArray(payloadSize)
+        System.arraycopy(input, iv.size, payload, 0, payloadSize)
+        val aesCipher = getCipher()
+        aesCipher.init(Cipher.DECRYPT_MODE, secretKey, ivParameterSpec)
+        return aesCipher.doFinal(payload)
+    }
+
+    override fun resetConfiguration(keyName: String) {
+        val preferences =
+            context?.getSharedPreferences(SHARED_PREFERENCES_NAME, Context.MODE_PRIVATE)
+        val editor = preferences?.edit()
+        editor?.remove(AES_PREFERENCES_KEY)
+        editor?.apply()
+
+        val ks = KeyStore.getInstance(KEYSTORE_PROVIDER_ANDROID)
+        ks.load(null)
+        ks.deleteEntry(keyName)
+    }
+
+    private fun getRsaCipher(): Cipher {
+        return Cipher.getInstance(
+            "RSA/ECB/PKCS1Padding",
+            "AndroidKeyStoreBCWorkaround"
+        )
     }
 
     private fun getCipher(): Cipher {
-        val transformation = "$ENCRYPTION_ALGORITHM/$ENCRYPTION_BLOCK_MODE/$ENCRYPTION_PADDING"
-        return Cipher.getInstance(transformation)
+        return Cipher.getInstance("AES/CBC/PKCS7Padding")
     }
 
-    private fun getOrCreateSecretKey(keyName: String): SecretKey {
+    private fun getOrCreateSecretKey(keyName: String, authRequired: Boolean): PrivateKey {
         // If Secretkey was previously created for that keyName, then grab and return it.
-        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
-        keyStore.load(null) // Keystore must be loaded before it can be accessed
-        keyStore.getKey(keyName, null)?.let { return it as SecretKey }
+        val ks = KeyStore.getInstance(KEYSTORE_PROVIDER_ANDROID)
+        ks.load(null)
+        ks.getKey(keyName, null)
+            ?.let { return it as PrivateKey }
 
         // if you reach here, then a new SecretKey must be generated for that keyName
-        val paramsBuilder = KeyGenParameterSpec.Builder(keyName,
-            KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
-        paramsBuilder.apply {
-            setBlockModes(ENCRYPTION_BLOCK_MODE)
-            setEncryptionPaddings(ENCRYPTION_PADDING)
-            setKeySize(KEY_SIZE)
-            setUserAuthenticationRequired(true)
+        return try {
+            createKeys(keyName, true, authRequired)
+        }catch (e: Exception){
+            Log.d("CreateKey", "This device doesn't support StrongBox")
+            createKeys(keyName, false, authRequired)
         }
-
-        val keyGenParams = paramsBuilder.build()
-        val keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES,
-            ANDROID_KEYSTORE)
-        keyGenerator.init(keyGenParams)
-        return keyGenerator.generateKey()
     }
 
+    private fun createKeys(keyName: String, setIsStrongBox: Boolean, authRequired: Boolean): PrivateKey {
+        val localeBeforeFakingEnglishLocale = Locale.getDefault()
+        try {
+            setLocale(Locale.ENGLISH)
+            val start = Calendar.getInstance()
+            val end = Calendar.getInstance()
+            end.add(Calendar.YEAR, 25)
+            val kpGenerator: KeyPairGenerator = KeyPairGenerator.getInstance(
+                TYPE_RSA,
+                KEYSTORE_PROVIDER_ANDROID
+            )
+            val spec: AlgorithmParameterSpec
+
+            val builder = KeyGenParameterSpec.Builder(
+                keyName,
+                KeyProperties.PURPOSE_DECRYPT or KeyProperties.PURPOSE_ENCRYPT
+            )
+                .setCertificateSubject(X500Principal("CN=$keyName"))
+                .setDigests(KeyProperties.DIGEST_SHA256)
+                .setBlockModes(KeyProperties.BLOCK_MODE_ECB)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_RSA_PKCS1)
+                .setCertificateSerialNumber(BigInteger.valueOf(1))
+                .setCertificateNotBefore(start.time)
+                .setCertificateNotAfter(end.time)
+                .setUserAuthenticationRequired(authRequired)
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                builder.setInvalidatedByBiometricEnrollment(true)
+            }
+
+            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q){
+                builder.setUserAuthenticationValidityDurationSeconds(86400)
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                builder.setUserAuthenticationParameters(86400, KeyProperties.AUTH_BIOMETRIC_STRONG)
+            }
+            if (setIsStrongBox) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    builder.setIsStrongBoxBacked(true)
+                }
+            }
+            spec = builder.build()
+            kpGenerator.initialize(spec)
+            val keyPair = kpGenerator.generateKeyPair()
+
+            return keyPair.private
+        } finally {
+            setLocale(localeBeforeFakingEnglishLocale)
+        }
+    }
+
+    /**
+     * Sets default locale.
+     */
+    private fun setLocale(locale: Locale) {
+        Locale.setDefault(locale)
+        val config = context!!.resources.configuration
+        config.setLocale(locale)
+        context!!.createConfigurationContext(config)
+    }
 }

@@ -13,7 +13,8 @@ class MethodChannelFlutterKeystore extends FlutterKeystorePlatform {
   final methodChannel = const MethodChannel('flutter_keystore');
 
   @override
-  Future<Uint8List?> encrypt({required AccessControl accessControl, required String message}) async{
+  Future<Uint8List?> encrypt(
+      {required AccessControl accessControl, required String message}) async {
     final result = await methodChannel.invokeMethod<Uint8List?>('encrypt', {
       'tag': accessControl.tag,
       'message': message,
@@ -22,9 +23,11 @@ class MethodChannelFlutterKeystore extends FlutterKeystorePlatform {
     });
     return result;
   }
-  
+
   @override
-  Future<String?> decrypt({required Uint8List message, required AccessControl accessControl}) async{
+  Future<String?> decrypt(
+      {required Uint8List message,
+      required AccessControl accessControl}) async {
     final result = await methodChannel.invokeMethod<String?>('decrypt', {
       'message': message,
       'tag': accessControl.tag,
@@ -32,5 +35,12 @@ class MethodChannelFlutterKeystore extends FlutterKeystorePlatform {
       'androidPromptInfo': accessControl.androidPromptInfo?.toMap()
     });
     return result;
+  }
+
+  @override
+  Future<void> resetConfiguration(
+      {required AccessControl accessControl}) async {
+    await methodChannel
+        .invokeMethod<bool>('resetConfiguration', {'tag': accessControl.tag});
   }
 }
