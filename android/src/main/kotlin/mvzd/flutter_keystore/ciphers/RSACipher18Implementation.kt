@@ -19,32 +19,46 @@ class RSACipher18Implementation {
     private val TYPE_RSA = "RSA"
     private var KEY_ALIAS: String? = null
     private var context: Context? = null
+    private var cipher: Cipher
 
-    constructor(context: Context, tag: String, authRequired: Boolean) {
+    constructor(context: Context, tag: String, rsaCipher: Cipher, authRequired: Boolean) {
         KEY_ALIAS = context.packageName + ".$tag"
         this.context = context
+        this.cipher = rsaCipher
         checkAndGeneratePrivateKey(authRequired)
     }
 
     fun wrap(key: Key?): ByteArray? {
         val publicKey: PublicKey = getPublicKey()
-        val cipher = getRSACipher()
-        cipher!!.init(Cipher.WRAP_MODE, publicKey)
+//        val cipher = getRSACipher()
+        cipher.init(Cipher.WRAP_MODE, publicKey)
         return cipher.wrap(key)
     }
 
     fun unwrap(wrappedKey: ByteArray?, algorithm: String?): Key? {
         val privateKey: PrivateKey = getPrivateKey()
-        val cipher = getRSACipher()
-        cipher!!.init(Cipher.UNWRAP_MODE, privateKey)
+//        val cipher = getRSACipher()
+        cipher.init(Cipher.UNWRAP_MODE, privateKey)
         return cipher.unwrap(wrappedKey, algorithm, Cipher.SECRET_KEY)
     }
 
-    private fun getRSACipher(): Cipher? {
-        return Cipher.getInstance(
-            "RSA/ECB/PKCS1Padding",
-            "AndroidKeyStoreBCWorkaround"
-        )
+//    private fun getRSACipher(): Cipher? {
+//        return Cipher.getInstance(
+//            "RSA/ECB/PKCS1Padding",
+//            "AndroidKeyStoreBCWorkaround"
+//        )
+//    }
+
+    fun getInitializeUnwrapCipher(cipher: Cipher, authRequired: Boolean): Cipher{
+        val privateKey: PrivateKey = getOrCreateSecretKey(authRequired)
+        cipher.init(Cipher.UNWRAP_MODE, privateKey)
+        return cipher
+    }
+
+    fun getInitializeWrapCipher(): Cipher{
+        val publicKey: PublicKey = getPublicKey()
+        cipher.init(Cipher.WRAP_MODE, publicKey)
+        return cipher
     }
 
     private fun checkAndGeneratePrivateKey(authRequired: Boolean) {
@@ -91,6 +105,11 @@ class RSACipher18Implementation {
             throw java.lang.Exception("Not an instance of a PrivateKey")
         }
         return key
+    }
+
+    fun getOrCreateSecretKey(authRequired: Boolean): PrivateKey {
+        checkAndGeneratePrivateKey(authRequired)
+        return getPrivateKey()
     }
 
     private fun getPublicKey(): PublicKey {

@@ -17,7 +17,7 @@ abstract class FlutterKeystorePlatform extends PlatformInterface {
   ///
   /// Defaults to [MethodChannelFlutterKeystore].
   static FlutterKeystorePlatform get instance => _instance;
-  
+
   /// Platform-specific implementations should set this with their own
   /// platform-specific class that extends [FlutterKeystorePlatform] when
   /// they register themselves.
@@ -26,7 +26,9 @@ abstract class FlutterKeystorePlatform extends PlatformInterface {
     _instance = instance;
   }
 
-  Future<Uint8List?> encrypt({required AccessControl accessControl, required String message});
-  Future<String?> decrypt({required Uint8List message, required AccessControl accessControl});
-  // Future<String?> getPublicKey();
+  Future<Uint8List?> encrypt(
+      {required AccessControl accessControl, required String message});
+  Future<String?> decrypt(
+      {required Uint8List message, required AccessControl accessControl});
+  Future<void> resetConfiguration({required AccessControl accessControl});
 }

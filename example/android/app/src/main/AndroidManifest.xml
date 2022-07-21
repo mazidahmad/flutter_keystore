@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="mvzd.flutter_keystore_example">
    <application
+        android:allowBackup="false"
+        android:fullBackupContent="false"
         android:label="flutter_keystore_example"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">

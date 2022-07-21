@@ -36,6 +36,15 @@ class _MyAppState extends State<MyApp> {
   late AccessControl _accessControl;
   late AndroidPromptInfo _androidPromptInfo;
 
+  void saveBiometric(value) async {
+    var prefs = await SharedPreferences.getInstance();
+    await prefs.setBool("authRequired", value);
+    setState(() {
+      _accessControl = _accessControl.copyWith(
+          tag: value ? tagBiometric : tag, setUserAuthenticatedRequired: value);
+    });
+  }
+
   void saveData() async {
     var prefs = await SharedPreferences.getInstance();
     await prefs.setStringList("datas", _listData);
@@ -45,7 +54,21 @@ class _MyAppState extends State<MyApp> {
     var prefs = await SharedPreferences.getInstance();
     setState(() {
       _listData = prefs.getStringList("datas") ?? [];
+      _isRequiresBiometric = prefs.getBool("authRequired") ?? false;
+      _accessControl = _accessControl.copyWith(
+          tag: _isRequiresBiometric! ? tagBiometric : tag,
+          setUserAuthenticatedRequired: _isRequiresBiometric);
     });
+  }
+
+  void resetConfig(AccessControl accessControl) async {
+    var prefs = await SharedPreferences.getInstance();
+    prefs.clear();
+    setState(() {
+      _listData = [];
+    });
+    await _flutterKeystorePlugin.resetConfiguration(
+        accessControl: accessControl);
   }
 
   @override
@@ -118,8 +141,8 @@ class _MyAppState extends State<MyApp> {
                         _isRequiresBiometric = value;
                         encrypted = Uint8List(0);
                         decrypted = "";
-                        _accessControl = _accessControl.copyWith(
-                            setUserAuthenticatedRequired: value);
+                        resetConfig(_accessControl);
+                        saveBiometric(value);
                       });
                     }),
               ],

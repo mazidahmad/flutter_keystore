@@ -1,10 +1,11 @@
 package mvzd.flutter_keystore.ciphers
 
 import android.content.Context
-import android.nfc.Tag
 import android.util.Base64
 import android.util.Log
 import java.security.Key
+import java.security.PrivateKey
+import java.security.PublicKey
 import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
@@ -19,11 +20,11 @@ class StorageCipher18Implementation: StorageCipher {
     private var cipher: Cipher? = null
     private var secureRandom: SecureRandom? = null
     private var secretKey: Key? = null
-    private var rsaCipher: RSACipher18Implementation? = null
+    private var rsaCipher: RSACipher18Implementation
 
-    constructor(context: Context, tag: String, authRequired: Boolean) {
+    constructor(context: Context, tag: String, rsaCipher: Cipher, authRequired: Boolean) {
         secureRandom = SecureRandom()
-        rsaCipher = RSACipher18Implementation(context, tag, authRequired)
+        this.rsaCipher = RSACipher18Implementation(context, tag, rsaCipher, authRequired)
         val preferences =
             context.getSharedPreferences(SHARED_PREFERENCES_NAME, Context.MODE_PRIVATE)
         val editor = preferences.edit()
@@ -33,19 +34,28 @@ class StorageCipher18Implementation: StorageCipher {
             val encrypted: ByteArray
             try {
                 encrypted = Base64.decode(aesKey, Base64.DEFAULT)
-                secretKey = rsaCipher!!.unwrap(encrypted, KEY_ALGORITHM)
+                secretKey = this.rsaCipher.unwrap(encrypted, KEY_ALGORITHM)
                 return
             } catch (e: Exception) {
                 Log.e("StorageCipher18Impl", "unwrap key failed", e)
             }
-        }else {
-            val key = ByteArray(keySize)
-            secureRandom!!.nextBytes(key)
-            secretKey = SecretKeySpec(key, KEY_ALGORITHM)
         }
-        val encryptedKey = rsaCipher!!.wrap(secretKey)
+
+        val key = ByteArray(keySize)
+        secureRandom!!.nextBytes(key)
+        secretKey = SecretKeySpec(key, KEY_ALGORITHM)
+
+        val encryptedKey = this.rsaCipher.wrap(secretKey)
         editor.putString(AES_PREFERENCES_KEY, Base64.encodeToString(encryptedKey, Base64.DEFAULT))
         editor.apply()
+    }
+
+    fun getInitializeUnwrapCipher(cipher: Cipher, authRequired: Boolean): Cipher{
+        return rsaCipher.getInitializeUnwrapCipher(cipher, authRequired)
+    }
+
+    fun getInitializeWrapCipher(): Cipher{
+        return rsaCipher.getInitializeWrapCipher()
     }
 
     override fun encrypt(input: ByteArray): ByteArray {
