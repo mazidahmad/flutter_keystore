@@ -165,15 +165,26 @@ class FlutterKeystorePlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
             when (call.method) {
                 "encrypt" -> {
                     if (options.authRequired && cipher == null) {
-                        authenticateToEncrypt(options) {
-                            this.cipher = it?.cipher
+                        try {
                             val encryptedData = cryptographyManager.encryptData(
-                                (this.message).toByteArray(Charsets.UTF_8),
-                                this.cipher!!,
-                                options
+                                    (this.message).toByteArray(Charsets.UTF_8),
+                                    this.cipher,
+                                    options
                             )
                             this.data = encryptedData
                             result.success(this.data)
+                        }catch (e: Exception){
+                            authenticateToEncrypt(options) {
+                                this.cipher = it?.cipher
+                                val encryptedData = cryptographyManager.encryptData(
+                                        (this.message).toByteArray(Charsets.UTF_8),
+                                        this.cipher,
+                                        options
+                                )
+                                this.data = encryptedData
+                                result.success(this.data)
+
+                            }
                         }
                     } else {
                         if (this.cipher == null) {
@@ -192,14 +203,35 @@ class FlutterKeystorePlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                 }
                 "decrypt" -> {
                     if (options.authRequired && cipher == null) {
-                        authenticateToDecrypt(options, this.data!!) {
-                            this.cipher = it?.cipher
-                            val resultData = cryptographyManager.decryptData(
-                                this.data!!,
-                                this.cipher!!,
-                                options
-                            )
-                            result.success(String(resultData))
+                        try {
+                            if (!options.oncePrompt){
+                                val resultData = cryptographyManager.decryptData(
+                                        this.data!!,
+                                        this.cipher!!,
+                                        options
+                                )
+                                result.success(String(resultData))
+                            }else{
+                                authenticateToDecrypt(options, this.data!!) {
+                                    this.cipher = it?.cipher
+                                    val resultData = cryptographyManager.decryptData(
+                                            this.data!!,
+                                            this.cipher,
+                                            options
+                                    )
+                                    result.success(String(resultData))
+                                }
+                            }
+                        }catch (e: Exception){
+                            authenticateToDecrypt(options, this.data!!) {
+                                this.cipher = it?.cipher
+                                val resultData = cryptographyManager.decryptData(
+                                        this.data!!,
+                                        this.cipher,
+                                        options
+                                )
+                                result.success(String(resultData))
+                            }
                         }
                     } else {
                         if (this.cipher == null) {
@@ -275,9 +307,9 @@ class FlutterKeystorePlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         if (BiometricManager.from(context).canAuthenticate() == BiometricManager
                 .BIOMETRIC_SUCCESS
         ) {
-            val cipher = cryptographyManager.getInitializedCipherForEncryption(options)
+
             val biometricPrompt = createBiometricPrompt(onSuccess)
-            biometricPrompt.authenticate(options.promptInfo, BiometricPrompt.CryptoObject(cipher))
+            biometricPrompt.authenticate(options.promptInfo)
         }
     }
 
@@ -289,10 +321,8 @@ class FlutterKeystorePlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         if (BiometricManager.from(context).canAuthenticate() == BiometricManager
                 .BIOMETRIC_SUCCESS
         ) {
-            val cipher =
-                cryptographyManager.getInitializedCipherForDecryption(options, data)
             val biometricPrompt = createBiometricPrompt(onSuccess)
-            biometricPrompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(cipher))
+            biometricPrompt.authenticate(promptInfo)
         }
     }
 

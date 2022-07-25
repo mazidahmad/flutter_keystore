@@ -1,6 +1,6 @@
 name: flutter_keystore
-description: A new Flutter plugin project.
-version: 0.0.1
+description: A new Flutter Keystore plugin project.
+version: 0.1.1
 homepage:
 
 environment:

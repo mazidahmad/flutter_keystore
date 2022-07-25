@@ -50,12 +50,12 @@ interface CryptographyManager {
     /**
      * The Cipher created with [getInitializedCipherForEncryption] is used here
      */
-    fun encryptData(input: ByteArray, cipher: Cipher, options: Options): ByteArray
+    fun encryptData(input: ByteArray, cipher: Cipher?, options: Options): ByteArray
 
     /**
      * The Cipher created with [getInitializedCipherForDecryption] is used here
      */
-    fun decryptData(input: ByteArray, cipher: Cipher,  options: Options): ByteArray
+    fun decryptData(input: ByteArray, cipher: Cipher?,  options: Options): ByteArray
 
     fun resetConfiguration(keyName: String)
 }
@@ -122,6 +122,7 @@ private class CryptographyManagerImpl(context: Context) : CryptographyManager {
 
     override fun getInitializedCipherForEncryption(options: Options): Cipher {
         val cipher = getRsaCipher()
+        getOrSaveAesKey(options)
         val secretKey = getOrCreateSecretKey(options)
         cipher.init(Cipher.UNWRAP_MODE, secretKey)
         return cipher
@@ -134,9 +135,10 @@ private class CryptographyManagerImpl(context: Context) : CryptographyManager {
         return cipher
     }
 
-    override fun encryptData(input: ByteArray, cipher: Cipher, options: Options): ByteArray {
+    override fun encryptData(input: ByteArray, cipher: Cipher?, options: Options): ByteArray {
+        val cipherRsa = getInitializedCipherForEncryption(options)
         val encryptedAes = getOrSaveAesKey(options)
-        val secretKey = unwrap(encryptedAes, cipher, KEY_ALGORITHM)
+        val secretKey = unwrap(encryptedAes, cipherRsa, KEY_ALGORITHM)
         val iv = ByteArray(ivSize)
         secureRandom!!.nextBytes(iv)
         val ivParameterSpec = IvParameterSpec(iv)
@@ -149,9 +151,10 @@ private class CryptographyManagerImpl(context: Context) : CryptographyManager {
         return combined
     }
 
-    override fun decryptData(input: ByteArray, cipher: Cipher, options: Options): ByteArray {
+    override fun decryptData(input: ByteArray, cipher: Cipher?, options: Options): ByteArray {
+        val cipherRsa = getInitializedCipherForDecryption(options, input)
         val encryptedAes = getOrSaveAesKey(options)
-        val secretKey = unwrap(encryptedAes, cipher, KEY_ALGORITHM)
+        val secretKey = unwrap(encryptedAes, cipherRsa, KEY_ALGORITHM)
         val iv = ByteArray(ivSize)
         System.arraycopy(input, 0, iv, 0, iv.size)
         val ivParameterSpec = IvParameterSpec(iv)
