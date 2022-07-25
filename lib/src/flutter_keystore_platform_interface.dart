@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:flutter_keystore/src/model/access_control.dart';
+import 'package:flutter_keystore/src/model/android_options.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import 'flutter_keystore_method_channel.dart';
@@ -27,8 +27,8 @@ abstract class FlutterKeystorePlatform extends PlatformInterface {
   }
 
   Future<Uint8List?> encrypt(
-      {required AccessControl accessControl, required String message});
+      {required AndroidOptions options, required String message});
   Future<String?> decrypt(
-      {required Uint8List message, required AccessControl accessControl});
-  Future<void> resetConfiguration({required AccessControl accessControl});
+      {required Uint8List message, required AndroidOptions options});
+  Future<void> resetConfiguration({required AndroidOptions options});
 }

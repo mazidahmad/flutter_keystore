@@ -2,7 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_keystore/src/model/access_control.dart';
+import 'package:flutter_keystore/src/model/android_options.dart';
 
 import 'flutter_keystore_platform_interface.dart';
 
@@ -14,33 +14,23 @@ class MethodChannelFlutterKeystore extends FlutterKeystorePlatform {
 
   @override
   Future<Uint8List?> encrypt(
-      {required AccessControl accessControl, required String message}) async {
-    final result = await methodChannel.invokeMethod<Uint8List?>('encrypt', {
-      'tag': accessControl.tag,
-      'message': message,
-      'authRequired': accessControl.setUserAuthenticatedRequired,
-      'androidPromptInfo': accessControl.androidPromptInfo?.toMap()
-    });
+      {required AndroidOptions options, required String message}) async {
+    final result = await methodChannel.invokeMethod<Uint8List?>(
+        'encrypt', {'message': message, 'options': options.toMap()});
     return result;
   }
 
   @override
   Future<String?> decrypt(
-      {required Uint8List message,
-      required AccessControl accessControl}) async {
-    final result = await methodChannel.invokeMethod<String?>('decrypt', {
-      'message': message,
-      'tag': accessControl.tag,
-      'authRequired': accessControl.setUserAuthenticatedRequired,
-      'androidPromptInfo': accessControl.androidPromptInfo?.toMap()
-    });
+      {required Uint8List message, required AndroidOptions options}) async {
+    final result = await methodChannel.invokeMethod<String?>(
+        'decrypt', {'message': message, 'options': options.toMap()});
     return result;
   }
 
   @override
-  Future<void> resetConfiguration(
-      {required AccessControl accessControl}) async {
+  Future<void> resetConfiguration({required AndroidOptions options}) async {
     await methodChannel
-        .invokeMethod<bool>('resetConfiguration', {'tag': accessControl.tag});
+        .invokeMethod<bool>('resetConfiguration', {'options': options.toMap()});
   }
 }

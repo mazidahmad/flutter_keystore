@@ -33,15 +33,15 @@ class _MyAppState extends State<MyApp> {
 
   List<String> _listData = [];
 
-  late AccessControl _accessControl;
+  late AndroidOptions _options;
   late AndroidPromptInfo _androidPromptInfo;
 
   void saveBiometric(value) async {
     var prefs = await SharedPreferences.getInstance();
     await prefs.setBool("authRequired", value);
     setState(() {
-      _accessControl = _accessControl.copyWith(
-          tag: value ? tagBiometric : tag, setUserAuthenticatedRequired: value);
+      _options = _options.copyWith(
+          tag: value ? tagBiometric : tag, authRequired: value);
     });
   }
 
@@ -55,20 +55,19 @@ class _MyAppState extends State<MyApp> {
     setState(() {
       _listData = prefs.getStringList("datas") ?? [];
       _isRequiresBiometric = prefs.getBool("authRequired") ?? false;
-      _accessControl = _accessControl.copyWith(
-          tag: _isRequiresBiometric! ? tagBiometric : tag,
-          setUserAuthenticatedRequired: _isRequiresBiometric);
+      _options = _options.copyWith(
+          tag: _isRequiresBiometric ? tagBiometric : tag,
+          authRequired: _isRequiresBiometric);
     });
   }
 
-  void resetConfig(AccessControl accessControl) async {
+  void resetConfig(AndroidOptions options) async {
     var prefs = await SharedPreferences.getInstance();
     prefs.clear();
     setState(() {
       _listData = [];
     });
-    await _flutterKeystorePlugin.resetConfiguration(
-        accessControl: accessControl);
+    await _flutterKeystorePlugin.resetConfiguration(options: options);
   }
 
   @override
@@ -79,15 +78,17 @@ class _MyAppState extends State<MyApp> {
         title: "Confirm Biometric",
         confirmationRequired: false,
         negativeButton: "Cancel Auth");
-    _accessControl = AccessControl(
+    _options = AndroidOptions(
         tag: _isRequiresBiometric ? tagBiometric : tag,
-        setUserAuthenticatedRequired: _isRequiresBiometric,
+        authRequired: _isRequiresBiometric,
+        authValidityDuration: 10,
+        oncePrompt: true,
         androidPromptInfo: _androidPromptInfo);
   }
 
   void encrypt(String message) {
     _flutterKeystorePlugin
-        .encrypt(accessControl: _accessControl, message: message)
+        .encrypt(options: _options, message: message)
         .then((value) {
       setState(() {
         encrypted = value ?? Uint8List(0);
@@ -100,7 +101,7 @@ class _MyAppState extends State<MyApp> {
   void decrypt(Uint8List data) async {
     try {
       await _flutterKeystorePlugin
-          .decrypt(message: data, accessControl: _accessControl)
+          .decrypt(message: data, options: _options)
           .then((value) {
         setState(() {
           decrypted = value ?? "";
@@ -141,7 +142,7 @@ class _MyAppState extends State<MyApp> {
                         _isRequiresBiometric = value;
                         encrypted = Uint8List(0);
                         decrypted = "";
-                        resetConfig(_accessControl);
+                        resetConfig(_options);
                         saveBiometric(value);
                       });
                     }),
